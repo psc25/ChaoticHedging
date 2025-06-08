@@ -11,9 +11,9 @@ tt = np.linspace(0, T, K)
 xi = 1.0
 rho = -0.7
 K_strike = 101.0
-Apar1 = np.loadtxt("vs/vs_par.csv", delimiter = ";")
+Apar1 = np.loadtxt("vs/vs_par.csv")
 Apar = np.reshape(Apar1, (d+1, d, d))
-X = np.loadtxt("vs/vs_X.csv", delimiter = ";")
+X = np.loadtxt("vs/vs_X.csv")
 X = np.reshape(X, (L, K, d))
 I = np.cumsum(np.concatenate([np.zeros([L, 1]), X[:, :, 0]], axis = 1), axis = 1)*dt/T
 
@@ -88,4 +88,4 @@ for k in range(K-1):
     end = time.time()
     print("Step " + str(k+1) + ", time " + str(round(end-begin, 1)) + "s, hedg " + str(np.round(hedg[0, k], 4)) + ", min " + str(np.round(np.min(hedg[:, k]), 4)) + ", max " + str(np.round(np.max(hedg[:, k]), 4)))
     
-np.savetxt("vs/vs_strat.csv", hedg, delimiter = ";")
+np.savetxt("vs/vs_hedg.csv", hedg)

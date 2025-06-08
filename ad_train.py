@@ -1,97 +1,92 @@
 import numpy as np
-import scipy.special as scsp
+import scipy.special as ssp
 from sklearn import linear_model
 import time
 
 d = 2
+
 L = 10000
 K = 500
 T = 1.0
 dt = T/K
 tt = np.linspace(0, T, K, dtype = np.float32)
 
-X1 = np.loadtxt("ad/ad_X.csv", delimiter = ";", dtype = np.float32)
-X = np.reshape(X1, [L, K, d])
-del X1
+X = np.reshape(np.loadtxt("ad/ad_X.csv", dtype = np.float32), [L, K, d])
+X0 = X[0:1, 0:1]
+G = np.loadtxt("ad/ad_G.csv", dtype = np.float32)
 
-Sigma = np.zeros([L, K, d, d])
-for i in range(d):
-    print("Loading Sigma for i = " + str(i+1) + "/" + str(d))
-    Sigma1 = np.loadtxt("ad/ad_Sigma_" + str(i+1) + ".csv", delimiter = ";", dtype = np.float32)
-    Sigma[:, :, :, i] = np.reshape(Sigma1, [L, K, d])
-    
-del Sigma1
-print("")
-
-G = np.loadtxt("ad/ad_G.csv", delimiter = ";", dtype = np.float32)
-
-NN = 6
+N = 6
 mn = 50
 val_split = 0.2
 Ltrain = int(L*(1.0-val_split))
 
-for N in range(NN+1):
-    print("Chaotic hedging for n <= " + str(N))
-    if N == 0:
+def dertanh(x):
+    return 1.0/np.square(np.cosh(x))
+
+begin = time.time()
+A = np.random.normal(size = [1, 1, 2*N, mn, d]).astype(dtype = np.float32)
+B = np.random.normal(size = [1, 1, 2*N, mn, d]).astype(dtype = np.float32)
+phi = np.tanh(A[:, :, :N]*np.reshape(tt[:-1], (1, -1, 1, 1, 1)) + B[:, :, :N])
+derphi = dertanh(A[:, :, :N]*np.reshape(tt[:-1], (1, -1, 1, 1, 1)) + B[:, :, :N])*A[:, :, :N]
+psi = np.tanh(A[:, :, N:]*np.reshape(tt[:-1], (1, -1, 1, 1, 1)) + B[:, :, N:])
+J1phi = np.zeros([L, K-1, N, mn], dtype = np.float32)
+tms = np.zeros(N)
+for n in range(N):
+    b1 = time.time()
+    WphiT = np.sum(phi[:, :, n]*np.expand_dims(X[:, :-1]/X0, axis = 2), axis = -1)
+    Wphi0 = np.sum(phi[:, :, n]*np.expand_dims(X[:, 0:1]/X0, axis = 2), axis = -1)
+    WphiI = np.cumsum(np.sum(derphi[:, :, n]*np.expand_dims(X[:, :-1]/X0, axis = 2), axis = -1)*dt, axis = 1)
+    J1phi[:, :, n] = np.power(WphiT-Wphi0-0.5*WphiI, n)/np.math.factorial(n)
+    print("Iterated Stratonovich integrals prepared for n = " + str(n) + "/" + str(N))
+    e1 = time.time()
+    tms[n] = e1-b1
+    
+end = time.time()
+print("Iterated Stratonovich integrals prepared in " + str(np.round(end-begin, 4)) + "s")
+print("")
+del A, B, WphiT, Wphi0, WphiI
+
+for n in range(N+1):
+    print("Chaotic hedging for N = " + str(n) + "/" + str(N))
+    if n == 0:
         b1 = time.time()
         Gpred = np.mean(G)*np.ones_like(G)
         Hpred = np.zeros([L, K-1, d])
         e1 = time.time()
     else:
         b1 = time.time()
-        
-        A = np.random.normal(size = [1, N, mn, d]).astype(dtype = np.float32)
-        B = np.random.normal(size = [1, N, mn, d]).astype(dtype = np.float32)
-        rnd_n = np.tanh(A*np.reshape(tt, (-1, 1, 1, 1)) + B)
-        
-        Hn = np.zeros([L, N, mn], dtype = np.float32)
-        print("Data preparation for n = 0/" + str(N))
-        begin = time.time()
-        for n in range(N):
-            print("Data preparation for n = " + str(n+1) + "/" + str(N))
-            phi = np.expand_dims(rnd_n[:-1, n], 0)
-            Wg = np.sum(np.expand_dims(X[:, 1:] - X[:, :-1], 2)*phi, axis = (1, 3))
-            Qg = np.sum(np.matmul(phi, Sigma[:, :-1])*phi*dt, axis = (1, 3))
-            Hn[:, n] = np.power(Qg, (n+1)/2)*scsp.eval_hermitenorm(n+1, Wg/np.sqrt(Qg))/np.math.factorial(n+1)
-            
-        end = time.time()
-        print("Data prepared in " + str(np.round(end-begin, 4)) + "s")
-        
-        Hn2 = np.reshape(Hn, [L, -1])
+        theta = np.expand_dims(J1phi[:, :, :n], axis = -1)*psi[:, :, :n]
+        gns = np.sum(theta*np.expand_dims(np.expand_dims(X[:, 1:] - X[:, :-1], axis = 2), axis = 2), axis = (1, 4))
+        gns1 = np.reshape(gns, [L, -1])
         begin = time.time()
         regr = linear_model.LinearRegression()
-        regr.fit(Hn2[:Ltrain], G[:Ltrain])
-        Y = np.reshape(regr.coef_, [1, N, mn])
+        regr.fit(gns1[:Ltrain], G[:Ltrain])
+        Y = np.reshape(regr.coef_, [1, n, mn, 1])
         end = time.time()
         print("Regression fitted in " + str(np.round(end-begin, 4)) + "s")
+        Gpred = regr.intercept_ + np.sum(Y[:, :, :, 0]*gns, axis = (1, 2))
+        del gns, gns1, regr
         
-        Gpred = regr.intercept_ + np.sum(Y*Hn, axis = (1, 2))
         begin = time.time()
-        Hpred = np.zeros([L, K-1, d])
-        for n in range(N):
-            print("Compute Hedge for n = " + str(n+1) + "/" + str(N))
-            phi = np.expand_dims(rnd_n[:-1, n], 0)
-            Wg = np.cumsum(np.sum(np.expand_dims(X[:, 1:] - X[:, :-1], 2)*phi, axis = -1), axis = 1)
-            Qg = np.cumsum(np.sum(np.matmul(phi, Sigma[:, :-1])*phi*dt, axis = -1), axis = 1)
-            Hn1 = np.expand_dims(Y[:, n:(n+1)]*np.power(Qg, n/2)*scsp.eval_hermitenorm(n, Wg/np.sqrt(Qg))/np.math.factorial(n), -1)
-            Hpred = Hpred + np.sum(Hn1*phi, -2)
-            
+        Hpred = np.sum(np.expand_dims(Y, axis = 0)*theta, axis = (2, 3))
         end = time.time()
-        print("Computed Hedge in " + str(np.round(end-begin, 4)) + "s")
+        print("Computed hedging strategy in " + str(np.round(end-begin, 4)) + "s")
         e1 = time.time()
+        del theta       
         
-    Gloss_train = np.mean(np.square(Gpred[:Ltrain] - G[:Ltrain]))
-    Gloss_test = np.mean(np.square(Gpred[Ltrain:] - G[Ltrain:]))
-
+    Gloss_train = np.sqrt(np.mean(np.square(Gpred[:Ltrain] - G[:Ltrain])))
+    Gloss_test = np.sqrt(np.mean(np.square(Gpred[Ltrain:] - G[Ltrain:])))
+    
     loss = np.array([Gloss_train, Gloss_test])
-    comp = np.array([np.round(e1-b1, 4), N*mn+1])
+    comp = np.array([np.round(np.sum(tms[:n]) + e1-b1, 4), n*mn+1])
     
     print("Losses: " + str(np.round(loss[0], 4)) + " and " + str(np.round(loss[1], 4)))
-    print("Performed in " + str(np.round(e1-b1, 4)) + "s")
+    print("Performed in " + str(comp[0]) + "s")
     print("")
     
-    np.savetxt("ad/ad_res_" + str(N) + ".csv", loss, delimiter = ";")
-    np.savetxt("ad/ad_cmp_" + str(N) + ".csv", comp, delimiter = ";")
+    np.savetxt("ad/ad_res_" + str(n) + ".csv", loss)
+    np.savetxt("ad/ad_cmp_" + str(n) + ".csv", comp)
     
-    np.savetxt("ad/ad_Gpr_" + str(N) + ".csv", Gpred, delimiter = ";")
-    np.savetxt("ad/ad_Hpr_" + str(N) + ".csv", np.reshape(Hpred, [L, (K-1)*d]), delimiter = ";")
+    np.savetxt("ad/ad_Gpr_" + str(n) + ".csv", Gpred)
+    np.savetxt("ad/ad_Hpr_" + str(n) + ".csv", np.reshape(Hpred, [L, -1]))
+    del Gpred, Hpred

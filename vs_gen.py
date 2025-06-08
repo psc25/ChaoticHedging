@@ -1,6 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+np.random.seed(0)
+
+d = 1
+
 L = 10000
 K = 500
 T = 1.0
@@ -8,8 +12,7 @@ dt = T/K
 tt = np.linspace(0, T, K)
 
 dB = np.random.normal(size = [L, K-1, 2])*np.sqrt(dt)
-B = np.zeros([L, K, 2])
-B[:, 1:, :] = np.cumsum(dB, axis = 1)
+B = np.concatenate([np.zeros([L, 1, 2]), np.cumsum(dB, axis = 1)], axis = 1)
 
 X0 = [100.0, 4.0]
 kappa = 0.5
@@ -24,7 +27,7 @@ Apar0 = np.zeros([2, 2])
 Apar1 = np.zeros([2, 2])
 Apar2 = np.reshape(np.array([1.0, xi*rho, xi*rho, xi**2]), [2, 2])
 Apar = np.stack([Apar0, Apar1, Apar2])
-np.savetxt("vs/vs_par.csv", np.reshape(Apar, [3, -1]), delimiter = ";")
+np.savetxt("vs/vs_par.csv", np.reshape(Apar, [3, -1]))
 
 X = np.zeros([L, K, 2])
 X[:, 0, 0] = X0[0]
@@ -48,8 +51,9 @@ G = np.fmax(K_strike - I, 0)
 print(np.mean(G))
 print(np.mean(Z[:, -1]*G))
 
-np.savetxt("vs/vs_X.csv", np.reshape(X, (L, 2*K)), delimiter = ";")
-np.savetxt("vs/vs_G.csv", G, delimiter = ";")
+np.savetxt("vs/vs_X.csv", np.reshape(X[:, :, 0], [L, -1]))
+np.savetxt("vs/vs_sigma.csv", np.reshape(X[:, :, 1], [L, -1]))
+np.savetxt("vs/vs_G.csv", G)
 
 plt.hist(X[:, -1, 0])
 plt.hist(G)

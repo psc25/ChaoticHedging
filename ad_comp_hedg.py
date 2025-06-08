@@ -8,23 +8,23 @@ T = 1.0
 dt = T/K
 tt = np.linspace(0, T, K)
 
-X1 = np.loadtxt("ad/ad_X.csv", delimiter = ";")
+X1 = np.loadtxt("ad/ad_X.csv")
 X = np.reshape(X1, (L, K, d))
 del X1
 
 Sigma = np.zeros([L, K, d, d])
 for i in range(d):
     print("Loading Sigma for i = " + str(i+1) + "/" + str(d))
-    Sigma1 = np.loadtxt("ad/ad_Sigma_" + str(i+1) + ".csv", delimiter = ";", dtype = np.float32)
+    Sigma1 = np.loadtxt("ad/ad_Sigma_" + str(i+1) + ".csv", dtype = np.float32)
     Sigma[:, :, :, i] = np.reshape(Sigma1, [L, K, d])
     
 del Sigma1
 print("")
 
-beta = int(np.loadtxt("ad/ad_beta.csv", delimiter = ";").item())
-U = np.loadtxt("ad/ad_U.csv", delimiter = ";")
-V = np.loadtxt("ad/ad_V.csv", delimiter = ";")
-rho = np.reshape(np.loadtxt("ad/ad_rho.csv", delimiter = ";"), [d, 1])
+beta = int(np.loadtxt("ad/ad_beta.csv").item())
+U = np.loadtxt("ad/ad_U.csv")
+V = np.loadtxt("ad/ad_V.csv")
+rho = np.reshape(np.loadtxt("ad/ad_rho.csv"), [d, 1])
 
 K_strike = 21.0
 w = np.ones([d, 1])
@@ -131,4 +131,4 @@ for k in range(K-1):
     end = time.time()        
     print("Step " + str(k+1) + ", time " + str(round(end-begin, 1)) + "s, hedg " + str(np.round(hedg[0, k], 4)))
     
-np.savetxt("ad/ad_strat.csv", np.reshape(hedg, [L, (K-1)*d]), delimiter = ";")
+np.savetxt("ad/ad_hedg.csv", np.reshape(hedg, [L, (K-1)*d]))

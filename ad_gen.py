@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+np.random.seed(100)
+
 d = 2
+
 L = 10000
 K = 500
 T = 1.0
@@ -17,10 +20,10 @@ V = 0.1*np.diag(np.random.normal(size = [d, 1])) + 0.05*np.random.normal(size = 
 rho = np.random.normal(size = [d, 1])
 rho = rho/np.linalg.norm(rho)*np.random.uniform(low = 0.1, high = 0.9)
 
-np.savetxt("ad/ad_beta.csv", np.array([beta]), delimiter = ";")
-np.savetxt("ad/ad_U.csv", U, delimiter = ";")
-np.savetxt("ad/ad_V.csv", V, delimiter = ";")
-np.savetxt("ad/ad_rho.csv", rho, delimiter = ";")
+np.savetxt("ad/ad_beta.csv", np.array([beta]))
+np.savetxt("ad/ad_U.csv", U)
+np.savetxt("ad/ad_V.csv", V)
+np.savetxt("ad/ad_rho.csv", rho)
 
 X = np.zeros([L, K, d])
 X[:, 0, :] = 10.0
@@ -31,7 +34,7 @@ ind_diag = np.diag_indices(2)
 S0[ind_diag] = S0[ind_diag] + 0.6*np.diag(np.random.normal(size = [d, 1]))
 S[:, 0] = np.expand_dims(S0, 0)
 Sigma[:, 0] = np.matmul(S[:, 0], np.transpose(S[:, 0], [0, 2, 1]))
-np.savetxt("ad/ad_S0.csv", np.reshape(S[0, 0], [d, beta]), delimiter = ";")
+np.savetxt("ad/ad_S0.csv", np.reshape(S[0, 0], [d, beta]))
 
 Z = np.random.normal(size = [L, K-1, d, 1])*np.sqrt(dt)
 E = np.random.normal(size = [L, K-1, d, beta])*np.sqrt(dt)
@@ -63,8 +66,8 @@ G = np.fmax(K_strike - np.sum(w*X[:, K-1], axis = 1), 0)
 plt.hist(G)
 plt.show()
 
-np.savetxt("ad/ad_X.csv", np.reshape(X, (L, K*d)), delimiter = ";")
+np.savetxt("ad/ad_X.csv", np.reshape(X, [L, -1]))
 for i in range(d):
-    np.savetxt("ad/ad_Sigma_" + str(i+1) + ".csv", np.reshape(Sigma[:, :, :, i], (L, K*d)), delimiter = ";")
+    np.savetxt("ad/ad_Sigma_" + str(i+1) + ".csv", np.reshape(Sigma[:, :, :, i], [L, -1]))
     
-np.savetxt("ad/ad_G.csv", G, delimiter = ";")
+np.savetxt("ad/ad_G.csv", G)
